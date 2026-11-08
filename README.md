@@ -53,6 +53,16 @@ deployment.
 ```
 
 The tests use mocked upstream HTTP responses and do not represent a completed
-live sandbox test. Real model and sandbox testing requires the credentials
-above. Free judge access to a model and sandbox account must be arranged in the
-competition testing instructions; do not publish private API secrets.
+live sandbox test. During development, a real Sandbox order was created with
+the configured merchant account; buyer approval and capture require an
+interactive Sandbox buyer. Real model and sandbox testing requires the
+credentials above. Free judge access to a model and sandbox account must be
+arranged in the competition testing instructions; do not publish private API
+secrets.
+
+An optional explicit Sandbox connectivity check creates an unapproved USD 2.00
+test order and never captures it:
+
+```bash
+.venv/bin/python scripts/smoke_sandbox_order.py --execute
+```
