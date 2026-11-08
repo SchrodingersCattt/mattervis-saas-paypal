@@ -73,13 +73,13 @@ class PremiumDisorder(Extension):
             html.Button("Retry paid job", id="premium-retry", n_clicks=0, disabled=True, style={"display": "none"}),
             html.Div(id="premium-checkout-feedback", role="status", style={"marginTop": "6px"}),
             html.Div(html.A("Continue to PayPal Sandbox", id="premium-approval-link", href="", style={"display": "none"}), style={"marginTop": "10px"}),
-            html.Div(id="premium-report", style={"marginTop": "12px", "fontSize": "0.9em"}),
             html.Div([
                 dcc.Dropdown(id="premium-candidate", placeholder="Select a candidate to inspect"),
                 html.Button("Open selected candidate", id="premium-open", n_clicks=0, disabled=True, style={"marginTop": "8px"}),
                 html.Div(id="premium-open-status", style={"marginTop": "6px"}),
                 html.P(html.A("Download results and provenance", id="premium-download", href="", target="_blank", style={"display": "none"})),
             ], id="premium-results-section", style={"display": "none"}),
+            html.Div(id="premium-report", style={"marginTop": "12px", "fontSize": "0.9em"}),
             html.P("PayPal Sandbox: no real money is charged.", style={"fontSize": "0.8em"}),
             dcc.Interval(id="premium-poll", interval=2500, n_intervals=0),
             html.Div(id="premium-approval-url", style={"display": "none"}),
@@ -173,11 +173,12 @@ class PremiumDisorder(Extension):
                     if selected not in names or not browser_target:
                         raise ValueError("Select a candidate first.")
                     path = service.result_path(job_id, owner, selected)
+                    label = next(f"Candidate {item['index'] + 1}" for item in record["candidates"] if item["filename"] == selected)
                     self.open_status[job_id] = "Opening candidate…"
 
                     def open_candidate():
                         try:
-                            scene = context.structures.register(path, label=selected).result(timeout=120)
+                            scene = context.structures.register(path, label=label).result(timeout=120)
                             context.structures.focus(scene, target=browser_target).result(timeout=120)
                             self.open_status[job_id] = "Candidate opened in a new MatterVis scene."
                         except Exception:
