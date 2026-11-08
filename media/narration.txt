@@ -1,9 +1,9 @@
-Scientific structures are rich with information, but turning a structure file into a clear figure can take time and specialist knowledge.
+Crystal structures often contain disordered atomic positions. Researchers need to compare possible ordered configurations without losing track of the original evidence.
 
-Meet MatterVis Studio. Upload a CIF, describe the figure you need, and an AI assistant proposes a rendering plan based on the structure's actual inspection data.
+MatterVis Studio keeps the original interactive viewer. Load a structure, rotate it, and choose how to explore the disorder. Here we enumerate alternative candidates and check the current scene before checkout.
 
-MatterVis then creates a real preview. The researcher can review the visual style and the assistant's explanation before deciding whether to buy the high-resolution export.
+This synthetic example has no hydrogen atoms. The source check makes that limitation visible before payment.
 
-Here we use PayPal Sandbox. The buyer approves the order in the sandbox, the server verifies the completed capture, and only then is the final figure unlocked. No real money moves.
+The researcher approves a two dollar PayPal Sandbox order. Once the server verifies the sandbox capture, the app generates candidate structures, checks each one, and asks an AI model to summarize the actual results and limitations.
 
-MatterVis Studio brings structure, intent and payment into a single workflow: from a scientific file to a figure ready to share.
+Open any candidate in MatterVis or download the CIF files, checks, parameters, commands, and hashes together. These are hypotheses for human review, not proof of an experimentally dominant structure.

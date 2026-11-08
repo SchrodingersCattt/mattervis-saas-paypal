@@ -1,68 +1,86 @@
-# MatterVis Studio
+# MatterVis Studio: Disorder Lab
 
-An AI-assisted scientific figure workflow built with the public MatterVis CLI
-and PayPal Sandbox. A researcher uploads a CIF, describes a figure, reviews a
-real MatterVis preview and buys a high-resolution PNG with sandbox funds. No
-live PayPal payment is used or supported by this demo.
+An interactive MatterVis viewer with a PayPal Sandbox workflow for researchers
+who need to inspect and export possible resolutions of crystallographic disorder.
+The original viewer's structure uploads, 3D controls and existing operations
+remain available. The extension checks the **current scene**, then offers a
+reproducible candidate bundle for a simulated USD 2.00 Sandbox payment.
 
-## What is new for the hackathon
+This is a hackathon prototype. The included synthetic example deliberately has
+no hydrogen atoms: the source and candidate checks call that out. Candidates
+are hypotheses; the app does not claim that any candidate is experimentally
+dominant or chemically validated. Review the raw CIFs, warnings and structures.
 
-The existing MatterVis SaaS provided structure inspection and rendering. This
-project adds a separate figure-planning interface, an OpenAI-compatible model
-integration, a preview/export workflow and server-verified PayPal Sandbox
-checkout. The underlying MatterVis output and the commands used to produce it
-are recorded with each job.
+## What the hackathon adds
+
+* A native MatterVis extension rather than a separate static image preview.
+* A frozen source CIF and method, candidate count, coupling and random seed.
+* MolCrysKit disorder detection, candidate generation and six sanity checks;
+  candidate CIFs, checks, API/command records and SHA-256 hashes are bundled.
+* An OpenAI-compatible model summarizes the actual results and limitations. If
+  the model fails, raw results remain available with an explicit failure notice.
+* A real PayPal Sandbox order and server-verified capture before a job runs.
+  Sandbox funds are fictitious; this app never calls live PayPal endpoints.
+
+The underlying MatterVis source is pinned to commit
+`d1de653154d2dba2411c71781d00c22c36f45759`. A small local patch prevents
+disorder errors being silently reported as an ordered structure. MatterVis in
+turn pins MolCrysKit to `d02ce08ab28826f87d976aef98fefb8b86998075`.
+See the [MatterVis repository](https://github.com/SchrodingersCattt/MatterVis)
+and [MolCrysKit repository](https://github.com/SchrodingersCattt/MolCrysKit).
 
 ## Run locally
 
-Requirements: Python 3.11 or later, `uv`, an OpenAI-compatible model endpoint,
-and PayPal developer sandbox credentials. A desktop browser is needed for the
-interactive application and PayPal buyer approval.
+Requirements: Git, Python 3.11+, network access to install dependencies, a
+PayPal developer Sandbox merchant app and buyer, and an OpenAI-compatible API.
+This development server is intended for one researcher on localhost; native
+MatterVis scenes are shared across tabs, so do not expose it to the public.
 
 ```bash
-uv sync --locked --extra dev --python 3.11
+git clone https://github.com/SchrodingersCattt/mattervis-saas-paypal.git
+cd mattervis-saas-paypal
+python -m venv .venv
+source .venv/bin/activate
+python scripts/setup_native.py
 cp .env.example .env
 ```
 
-On Windows use `.venv\Scripts\python` instead of `.venv/bin/python`. Set
-`AI_BASE_URL` (including `/v1` if required by your provider), `AI_API_KEY`,
-`AI_MODEL`, `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` and a random
-`APP_SECRET_KEY` in `.env`. The PayPal values must be from a **Sandbox** app.
-Set `APP_BASE_URL` to the browser-reachable address; by default it is
-`http://127.0.0.1:50001`.
+On Windows use `.venv\Scripts\Activate.ps1` and `Copy-Item .env.example .env`.
+The setup script checks out the pinned open-source MatterVis, applies the
+included patch, and installs its web dependencies into this virtual environment.
+It will stop rather than overwrite a checkout at a different revision.
+
+Fill in `.env`: `AI_BASE_URL` (including `/v1` where appropriate),
+`AI_API_KEY`, `AI_MODEL`, `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, and a
+random `APP_SECRET_KEY`. Use **Sandbox** PayPal credentials. `APP_BASE_URL`
+must be the address reachable by the buyer's browser; the default is
+`http://127.0.0.1:50001`. Do not publish `.env` or private structures.
 
 ```bash
-.venv/bin/python -m contest.app
+python -m contest.native_app
 ```
 
-Open <http://127.0.0.1:50001>, use the included synthetic example or upload a
-CIF, enter a figure request and generate a preview. For checkout, sign in using
-a PayPal **sandbox buyer** account, not a live account. Successful server-side
-capture unlocks the PNG. Cancelled or failed checkout does not unlock it.
+Open <http://127.0.0.1:50001>. The sample is an actual synthetic CIF, loaded
+into the original interactive viewer. Upload a different CIF using the native
+viewer if desired. In the right panel select a method, click **Check current
+scene**, read the warnings, and click **Pay $2.00 with PayPal Sandbox**. Sign in
+as the virtual buyer and approve the order. After returning, wait for the job;
+select each candidate to open it in MatterVis or download the ZIP. A failed
+paid job can be retried without another payment.
 
-The figure price is a fixed USD 2.00 in simulated sandbox funds. The app uses
-only the PayPal sandbox API host. Do not commit `.env`, model keys, sandbox
-secrets, local jobs or personal structures. The single-user development server
-is intended for local judging and requires additional hardening before public
-deployment.
+The configured AI provider receives the structural summary and check results,
+which can include scientific data from the selected structure. The provider's
+availability and data handling are determined by your own account settings.
 
 ## Testing
 
 ```bash
-.venv/bin/python -m pytest tests/test_contest.py
+python -m pytest tests/test_premium_disorder.py
 ```
 
-The tests use mocked upstream HTTP responses and do not represent a completed
-live sandbox test. During development, a real Sandbox order was created with
-the configured merchant account; buyer approval and capture require an
-interactive Sandbox buyer. Real model and sandbox testing requires the
-credentials above. Free judge access to a model and sandbox account must be
-arranged in the competition testing instructions; do not publish private API
-secrets.
-
-An optional explicit Sandbox connectivity check creates an unapproved USD 2.00
-test order and never captures it:
-
-```bash
-.venv/bin/python scripts/smoke_sandbox_order.py --execute
-```
+The test generates real structures with MolCrysKit but **mocks the payment
+capture**. It verifies that access is restricted until the server records an
+entitlement, candidates are distinct, and the missing-hydrogen warnings are
+preserved. A real PayPal Sandbox transaction requires interactive buyer
+approval; set up your own Sandbox buyer to test it. The older figure prototype
+and the original MatterVis SaaS API remain in the repository for reference.

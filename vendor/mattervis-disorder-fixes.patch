@@ -1,0 +1,68 @@
+diff --git a/mat_viewer/app/callbacks_disorder.py b/mat_viewer/app/callbacks_disorder.py
+index d1b7f4d..fbc9997 100644
+--- a/mat_viewer/app/callbacks_disorder.py
++++ b/mat_viewer/app/callbacks_disorder.py
+@@ -61 +61 @@ def _preview_mesh_for_indices(scene: dict[str, Any], style: dict[str, Any], raw_
+-def _replica_rows(replicas: list[dict[str, Any]], *, status: str = "ok") -> list[Any]:
++def _replica_rows(replicas: list[dict[str, Any]], *, status: str = "ok", error: str | None = None) -> list[Any]:
+@@ -63 +63,2 @@ def _replica_rows(replicas: list[dict[str, Any]], *, status: str = "ok") -> list
+-        return [html.Div("Resolve disorder failed. See server log for details.", className="disorder-empty disorder-empty--error")]
++        message = f"Resolve disorder failed: {error}" if error else "Resolve disorder failed. See server log for details."
++        return [html.Div(message, className="disorder-empty disorder-empty--error")]
+@@ -150,0 +152 @@ def register_disorder_callbacks(app, backend):
++        error_message = None
+@@ -189,0 +192 @@ def register_disorder_callbacks(app, backend):
++            error_message = str(exc).strip()[:400] or exc.__class__.__name__
+@@ -202,0 +206 @@ def register_disorder_callbacks(app, backend):
++            "error": error_message,
+@@ -204 +208 @@ def register_disorder_callbacks(app, backend):
+-        return store, _replica_rows(replicas, status=status)
++        return store, _replica_rows(replicas, status=status, error=error_message)
+diff --git a/mat_viewer/operations/disorder.py b/mat_viewer/operations/disorder.py
+index d279770..7e5bfd2 100644
+--- a/mat_viewer/operations/disorder.py
++++ b/mat_viewer/operations/disorder.py
+@@ -191 +191 @@ def _disorder_raw_indices(raw_atoms: list[dict[str, Any]]) -> set[int]:
+-    """Raw-atom indices that participate in occupancy disorder (occ < 1).
++    """Raw indices marked by partial occupancy or explicit disorder groups.
+@@ -196 +196,3 @@ def _disorder_raw_indices(raw_atoms: list[dict[str, Any]]) -> set[int]:
+-    so disorder membership is a plain occupancy test on ``raw_atoms``.
++    Explicit assembly/group metadata also matters when occupancy is missing or
++    normalised to one. The resolver remains responsible for interpreting that
++    metadata; this function only identifies sites eligible for preview.
+@@ -207,0 +210,6 @@ def _disorder_raw_indices(raw_atoms: list[dict[str, Any]]) -> set[int]:
++            continue
++        for key in ("dg", "da", "_atom_site_disorder_group", "_atom_site_disorder_assembly"):
++            value = str(atom.get(key) or "").strip()
++            if value and value not in {".", "?", "0"}:
++                out.add(idx)
++                break
+@@ -245,7 +252,0 @@ def resolve_disorder_with_crystals(
+-    # A loaded scene the structure summary calls "none detected" has atoms
+-    # and no occupancy disorder. Enumerating that still used to return MCK
+-    # replicas. An empty raw-atom list is not that signal: callers that only
+-    # have a CIF path still go through MolCrysKit.
+-    if raw_atoms and not _disorder_raw_indices(raw_atoms):
+-        return [], {}
+-
+@@ -257 +258,6 @@ def resolve_disorder_with_crystals(
+-    if source_disorder is False:
++    # An authoritative scanner result must not be overridden by incomplete
++    # raw-atom occupancy metadata. If scanning was unavailable, an explicit
++    # group or partial occupancy still allows the resolver to inspect it.
++    if source_disorder is False or (
++        source_disorder is None and raw_atoms and not _disorder_raw_indices(raw_atoms)
++    ):
+@@ -261,4 +267,8 @@ def resolve_disorder_with_crystals(
+-        optimal_full = _call_mck_replicas(cif_path, method="optimal", count=1, seed=None)
+-        replica_full = _call_mck_replicas(cif_path, method=method, count=count, seed=seed)
+-    except Exception:
+-        return [], {}
++        optimal_full = _call_mck_replicas(
++            cif_path, method="optimal", count=1, seed=seed if method == "optimal" else None
++        )
++        replica_full = optimal_full if method == "optimal" else _call_mck_replicas(
++            cif_path, method=method, count=count, seed=seed
++        )
++    except Exception as exc:
++        raise RuntimeError(f"Disorder resolution failed: {exc}") from exc
