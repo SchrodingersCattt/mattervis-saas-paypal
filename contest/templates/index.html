@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MatterVis Studio — from structure to story</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">M</span><span>MatterVis <b>Studio</b></span></a>
+    <div class="top-meta"><span class="status-dot"></span> PAYPAL SANDBOX <span class="meta-divider"></span> RESEARCH PREVIEW</div>
+  </header>
+
+  <main class="page">
+    <section class="intro">
+      <p class="eyebrow"><span>01 / FIGURE STUDIO</span><span class="intro-line"></span> STRUCTURE, MADE VISIBLE</p>
+      <div class="intro-row"><div><h1>Make your structure<br><em>say more.</em></h1><p class="lede">Turn a crystal structure and a sentence into a figure worth sharing. Preview the result, then purchase a high-resolution export with PayPal Sandbox.</p></div>
+        <div class="intro-note"><span>DESIGNED FOR</span><strong>Researchers<br>&amp; makers</strong><small>Powered by MatterVis + AI</small></div>
+      </div>
+    </section>
+
+    <div class="workspace">
+      <section class="panel input-panel">
+        <div class="panel-head"><div><span class="step">01</span><h2>Build your figure</h2></div><span class="micro">AI-ASSISTED</span></div>
+        <p class="panel-copy">Start with your structure. Tell the assistant what you want to emphasize.</p>
+        <form id="figure-form">
+          <label class="field-label" for="cif">STRUCTURE FILE <span>.CIF · MAX 2 MB</span></label>
+          <label class="dropzone" for="cif"><span class="upload-icon">↥</span><strong id="file-name">Choose a CIF file</strong><small>or use the included example below</small><input id="cif" name="file" type="file" accept=".cif" required></label>
+          <button class="text-button" type="button" id="example">Use example structure <span>↗</span></button>
+          <label class="field-label request-label" for="prompt">CREATIVE DIRECTION <span>IN YOUR OWN WORDS</span></label>
+          <textarea id="prompt" name="prompt" maxlength="2000" rows="4" placeholder="e.g. Show a clean ball-and-stick figure with hydrogens visible." required></textarea>
+          <button class="primary" id="generate" type="submit"><span>Generate preview</span><span>↗</span></button>
+        </form>
+        <div class="privacy-note"><span>✳</span><p>Your structure stays in this running demo. The model receives inspection metadata and your description.</p></div>
+      </section>
+
+      <section class="panel output-panel">
+        <div class="panel-head"><div><span class="step">02</span><h2>Your preview</h2></div><span class="micro" id="result-status">AWAITING STRUCTURE</span></div>
+        <div class="canvas" id="canvas"><div class="empty-state" id="empty"><span class="empty-icon">◇</span><strong>Your next figure starts here</strong><p>Upload a CIF or try the sample to see MatterVis in action.</p></div><img id="preview" alt="MatterVis structure preview" hidden><span class="preview-tag" id="preview-tag" hidden>PREVIEW</span></div>
+        <div id="result" hidden>
+          <div class="result-heading"><div><span class="micro">ASSISTANT'S PLAN</span><h3 id="result-title">Figure ready</h3></div><span class="style-pill" id="style-pill"></span></div>
+          <p id="explanation" class="explanation"></p>
+          <div class="purchase"><div><span class="micro">HIGH-RESOLUTION EXPORT</span><strong>$2.00 <small>USD · SANDBOX</small></strong></div><button id="checkout" class="paypal" type="button">Unlock with PayPal <span>↗</span></button><a id="download" class="paypal download" hidden>Download figure <span>↓</span></a></div>
+          <p class="footnote">This is a PayPal sandbox transaction. No real money moves.</p>
+        </div>
+      </section>
+    </div>
+    <div class="notice" id="notice" role="status" aria-live="polite" hidden></div>
+    <footer><span>MATTERVIS STUDIO <b>·</b> A DIFFERENT VIEW OF YOUR DATA</span><span>POWERED BY MATTERVIS / PAYPAL / AI</span></footer>
+  </main>
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</body>
+</html>

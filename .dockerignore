@@ -1,0 +1,11 @@
+.git
+.pytest_cache
+.ruff_cache
+.test-tmp*
+.manual*
+.local
+__pycache__
+*.py[cod]
+tests
+docs
+.github

@@ -1,0 +1,9 @@
+Scientific structures are rich with information, but turning a structure file into a clear figure can take time and specialist knowledge.
+
+Meet MatterVis Studio. Upload a CIF, describe the figure you need, and an AI assistant proposes a rendering plan based on the structure's actual inspection data.
+
+MatterVis then creates a real preview. The researcher can review the visual style and the assistant's explanation before deciding whether to buy the high-resolution export.
+
+Here we use PayPal Sandbox. The buyer approves the order in the sandbox, the server verifies the completed capture, and only then is the final figure unlocked. No real money moves.
+
+MatterVis Studio brings structure, intent and payment into a single workflow: from a scientific file to a figure ready to share.
