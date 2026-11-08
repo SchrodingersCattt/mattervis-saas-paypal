@@ -3,9 +3,10 @@ from __future__ import annotations
 import io
 
 import pytest
+import requests
 
 from contest import app as studio
-from contest.integrations import IntegrationError, PayPalSandbox
+from contest.integrations import IntegrationError, PayPalSandbox, model_json
 
 
 @pytest.fixture
@@ -108,3 +109,20 @@ def test_unavailable_labels_are_not_claimed(monkeypatch):
     plan = studio.build_plan("Show atom labels", {})
     assert plan["show_labels"] is False
     assert "not available" in plan["explanation"]
+
+
+def test_model_quota_error_is_clear_without_exposing_credentials(monkeypatch):
+    monkeypatch.setenv("AI_BASE_URL", "https://model.example/v1")
+    monkeypatch.setenv("AI_API_KEY", "secret-for-test")
+    monkeypatch.setenv("AI_MODEL", "demo")
+
+    class Response:
+        status_code = 402
+
+        def raise_for_status(self):
+            raise requests.HTTPError(response=self)
+
+    monkeypatch.setattr(requests, "post", lambda *_args, **_kwargs: Response())
+    with pytest.raises(IntegrationError, match="HTTP 402") as exc:
+        model_json("system", "prompt")
+    assert "secret-for-test" not in str(exc.value)

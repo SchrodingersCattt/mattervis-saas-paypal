@@ -50,8 +50,15 @@ def model_json(system: str, prompt: str) -> dict:
         if not isinstance(result, dict):
             raise TypeError("not an object")
         return result
-    except (requests.RequestException, KeyError, IndexError, TypeError, ValueError) as exc:
-        raise IntegrationError("The model could not return valid JSON. Check its configuration and retry.") from exc
+    except requests.Timeout as exc:
+        raise IntegrationError("The model request timed out. Retry the operation.") from exc
+    except requests.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else "unknown"
+        raise IntegrationError(f"The model endpoint returned HTTP {status}.") from exc
+    except requests.RequestException as exc:
+        raise IntegrationError("The model endpoint could not be reached from this machine.") from exc
+    except (KeyError, IndexError, TypeError, ValueError) as exc:
+        raise IntegrationError("The model did not return a valid JSON object. Retry the operation.") from exc
 
 
 class PayPalSandbox:
