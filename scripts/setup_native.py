@@ -24,7 +24,11 @@ if not VENDOR.exists():
 head = subprocess.check_output(["git", "-C", str(VENDOR), "rev-parse", "HEAD"], text=True).strip()
 if head != REVISION:
     raise SystemExit("The local MatterVis checkout is not the pinned revision; inspect it before proceeding.")
-if run("git", "-C", str(VENDOR), "apply", "--unidiff-zero", "--reverse", "--check", str(PATCH), check=False).returncode:
+reverse_check = subprocess.run(
+    ["git", "-C", str(VENDOR), "apply", "--unidiff-zero", "--reverse", "--check", str(PATCH)],
+    cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
+)
+if reverse_check.returncode:
     run("git", "-C", str(VENDOR), "apply", "--unidiff-zero", "--check", str(PATCH))
     run("git", "-C", str(VENDOR), "apply", "--unidiff-zero", str(PATCH))
 run(sys.executable, "-m", "pip", "install", "-e", str(VENDOR) + "[web]", "dash>=4.1,<5", "requests>=2.32,<3", "python-dotenv>=1,<2", "pytest>=8")

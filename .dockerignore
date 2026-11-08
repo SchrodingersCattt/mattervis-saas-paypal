@@ -4,6 +4,10 @@
 .test-tmp*
 .manual*
 .local
+.cache
+.env
+.env.*
+!.env.example
 __pycache__
 *.py[cod]
 tests

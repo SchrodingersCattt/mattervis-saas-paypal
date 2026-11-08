@@ -68,6 +68,9 @@ as the virtual buyer and approve the order. After returning, wait for the job;
 select each candidate to open it in MatterVis or download the ZIP. A failed
 paid job can be retried without another payment.
 
+An optional Dockerfile is also provided. The local virtual-environment path
+above is the tested installation path; bind any container port to localhost.
+
 The configured AI provider receives the structural summary and check results,
 which can include scientific data from the selected structure. The provider's
 availability and data handling are determined by your own account settings.
