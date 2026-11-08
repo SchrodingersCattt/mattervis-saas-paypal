@@ -61,6 +61,20 @@ def test_mcp_ask_question_elicits_and_returns_a_choice(tmp_path):
         service.close()
 
 
+def test_mcp_question_requires_english_labels(tmp_path):
+    service = DisorderService(tmp_path / "jobs")
+
+    async def run():
+        async with create_connected_server_and_client_session(create_mcp_server(context(service, tmp_path))) as client:
+            result = decode_tool_result(await client.call_tool("ask_question", {"question": "选择方法？", "options": ["枚举", "随机"]}))
+            assert result["status"] == "invalid"
+
+    try:
+        asyncio.run(run())
+    finally:
+        service.close()
+
+
 def test_supercell_does_not_invent_missing_factors(tmp_path):
     service = DisorderService(tmp_path / "jobs")
     tool_context = context(service, tmp_path)
@@ -229,7 +243,7 @@ def test_generic_question_answer_cannot_authorize_payment(tmp_path, monkeypatch)
             return {"role": "assistant", "content": None, "tool_calls": [{"id": "paid", "type": "function", "function": {
                 "name": "resolve_disorder_paid", "arguments": '{"method":"enumerate","count":2}'}}]}
         return {"role": "assistant", "content": None, "tool_calls": [{"id": "question", "type": "function", "function": {
-            "name": "ask_question", "arguments": json.dumps({"question": "Continue?", "options": ["同意支付", "取消"]}, ensure_ascii=False)}}]}
+            "name": "ask_question", "arguments": json.dumps({"question": "Continue?", "options": ["Yes, approve", "Cancel"]}, ensure_ascii=False)}}]}
 
     monkeypatch.setattr("contest.chat_agent._model_request", model)
     monkeypatch.setattr(PayPalSandbox, "create_order", lambda *_: orders.append(True))
@@ -237,12 +251,54 @@ def test_generic_question_answer_cannot_authorize_payment(tmp_path, monkeypatch)
     try:
         chat.submit("owner", "请处理无序", **params)
         first = wait_phase(chat, "owner", "awaiting_question")
-        chat.submit("owner", "同意支付", expected_prompt_id=first["pending_id"], **params)
+        chat.submit("owner", "Yes, approve", expected_prompt_id=first["pending_id"], **params)
         wait_phase(chat, "owner", "awaiting_consent")
         assert not orders
         chat.submit("owner", "取消", **params)
         wait_phase(chat, "owner", "idle")
         assert not orders
+    finally:
+        chat.close()
+        service.close()
+
+
+def test_non_english_model_response_is_retried_in_english(tmp_path, monkeypatch):
+    service = DisorderService(tmp_path / "jobs")
+    chat = ChatService(service, tmp_path / "artifacts")
+    replies = iter([{"role": "assistant", "content": "结构有无序。"},
+                    {"role": "assistant", "content": "The structure contains disorder."}])
+    monkeypatch.setattr("contest.chat_agent._model_request", lambda *_: next(replies))
+    params = {"source": SOURCE, "scene_id": "scene-1", "scene_name": "example", "browser_target": None, "structures": None}
+    try:
+        chat.submit("owner", "检查这个结构", **params)
+        state = wait_phase(chat, "owner", "idle")
+        assert state["messages"][-1]["text"] == "The structure contains disorder."
+    finally:
+        chat.close()
+        service.close()
+
+
+def test_paid_report_goal_excludes_unrelated_prior_requests(tmp_path, monkeypatch):
+    service = DisorderService(tmp_path / "jobs")
+    chat = ChatService(service, tmp_path / "artifacts")
+
+    def model(messages, _tools):
+        if messages[-1]["content"] == "Explain the supercell":
+            return {"role": "assistant", "content": "The supercell is ready."}
+        return {"role": "assistant", "content": None, "tool_calls": [{"id": "paid", "type": "function", "function": {
+            "name": "resolve_disorder_paid", "arguments": '{"method":"enumerate","count":2}'}}]}
+
+    monkeypatch.setattr("contest.chat_agent._model_request", model)
+    params = {"source": SOURCE, "scene_id": "scene-1", "scene_name": "example", "browser_target": None, "structures": None}
+    try:
+        chat.submit("owner", "Explain the supercell", **params)
+        wait_phase(chat, "owner", "idle")
+        chat.submit("owner", "Enumerate two disorder candidates", **params)
+        state = wait_phase(chat, "owner", "awaiting_consent")
+        job = service.load(state["job_id"], "owner")
+        assert job["research_goal"] == "Enumerate two disorder candidates"
+        chat.submit("owner", "Cancel", **params)
+        wait_phase(chat, "owner", "idle")
     finally:
         chat.close()
         service.close()

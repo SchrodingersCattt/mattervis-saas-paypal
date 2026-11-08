@@ -59,10 +59,10 @@ class MatterVisChat(Extension):
             html.P("Ask about the current structure, build a supercell, or request disorder analysis."),
             html.Div(id="chat-messages", className="chat-messages", role="log", **{"aria-live": "polite"}),
             html.Div(id="chat-status", className="chat-status", role="status"),
-            dcc.Textarea(id="chat-input", placeholder="例如：检查当前结构，或帮我建立 2×2×1 超胞…", maxLength=2000,
+            dcc.Textarea(id="chat-input", placeholder="Ask me to inspect the structure or build a 2×2×1 supercell…", maxLength=2000,
                          style={"width": "100%", "height": "76px"}),
-            html.Button("Send / 发送", id="chat-send", n_clicks=0, style={"marginTop": "8px"}),
-            html.Span("Enter 发送 · Ctrl+Enter 换行", className="chat-key-hint"),
+            html.Button("Send", id="chat-send", n_clicks=0, style={"marginTop": "8px"}),
+            html.Span("Enter to send · Ctrl+Enter for a new line", className="chat-key-hint"),
             html.Div(id="chat-actions", style={"marginTop": "12px"}),
             html.Div(id="chat-open-trigger", style={"display": "none"}),
             html.Div(id="chat-paypal-url", style={"display": "none"}),
@@ -176,6 +176,7 @@ class MatterVisChat(Extension):
         def update_chat(_poll, ack):
             owner = owner_id()
             feedback = (ack or {}).get("error", "")
+            chat.restore_paid_job(owner, session.get("premium_job", ""))
             handle = chat.take_view_action(owner)
             if handle is not None:
                 try:
@@ -186,7 +187,7 @@ class MatterVisChat(Extension):
             view = chat.snapshot(owner)
             if view["job_id"] and session.get("premium_job") != view["job_id"]:
                 session["premium_job"] = view["job_id"]
-            messages = view["messages"] or [{"role": "assistant", "text": "你好！我可以检查当前结构、建立超胞，或在你同意后使用 PayPal 沙箱进行无序拆分。\n\nI can inspect this structure, build a supercell, or ask before paid disorder analysis."}]
+            messages = view["messages"] or [{"role": "assistant", "text": "I can inspect this structure, build a supercell, or ask before paid disorder analysis."}]
             bubbles = []
             for item in messages[-60:]:
                 content = [dcc.Markdown(item["text"], link_target="_blank") if item["role"] == "assistant" else item["text"]]
@@ -205,7 +206,7 @@ class MatterVisChat(Extension):
             actions = []
             if view["approval_url"]:
                 actions.extend([html.A("Open PayPal Sandbox", href=view["approval_url"], target="_blank", rel="noopener noreferrer", className="chat-payment-link"),
-                                html.A("Cancel / 取消", href="/checkout/cancel", target="_blank", rel="noopener noreferrer", style={"marginLeft": "12px"})])
+                                html.A("Cancel", href="/checkout/cancel", target="_blank", rel="noopener noreferrer", style={"marginLeft": "12px"})])
             if view["job_id"]:
                 try:
                     job = service.load(view["job_id"], owner)

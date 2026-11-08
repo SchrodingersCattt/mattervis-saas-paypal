@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from contest.disorder_service import DisorderService, validate_options
+from contest.chat_agent import ChatService
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "contest" / "static" / "disorder-example.cif"
 
@@ -89,6 +90,16 @@ def test_real_disorder_workflow_requires_payment_and_keeps_warnings(tmp_path, mo
             assert len(manifest["candidates"]) == 2
             assert manifest["software"]["molcrys_kit"]["file_sha256"]["analysis/sanity_check.py"]
             assert any(name.startswith("preflight/") for name in bundle.namelist())
+        chat = ChatService(service, tmp_path / "artifacts")
+        try:
+            assert not chat.restore_paid_job("other-owner", job["id"])
+            assert chat.restore_paid_job("owner", job["id"])
+            restored = chat.snapshot("owner")
+            assert restored["job_id"] == job["id"]
+            assert any("Two hypotheses" in item["text"] for item in restored["messages"])
+            assert not chat.restore_paid_job("owner", job["id"])
+        finally:
+            chat.close()
     finally:
         service.close()
 

@@ -36,6 +36,7 @@ class ToolContext:
     structures: Any
     artifact_root: Path
     user_goal: str
+    recent_user_text: str = ""
     pending_job_id: str | None = None
     inspection: dict | None = None
     expose_paths: bool = False
@@ -70,6 +71,8 @@ def create_mcp_server(context: ToolContext) -> FastMCP:
         choices = [item.strip() for item in options if isinstance(item, str) and item.strip()]
         if not question or len(question) > 500 or not 2 <= len(choices) <= 4 or any(len(item) > 100 for item in choices):
             return {"status": "invalid", "message": "A short question with 2–4 short options is required."}
+        if re.search(r"[\u4e00-\u9fff]", question + " ".join(choices)):
+            return {"status": "invalid", "message": "Please phrase the question and choices in English."}
         if len({item.casefold() for item in choices}) != len(choices) or any(item.casefold() == "other" for item in choices):
             return {"status": "invalid", "message": "Options must be distinct; an Other option is provided automatically."}
         # MCP's elicitation validator accepts primitive annotations; attach the
@@ -93,9 +96,10 @@ def create_mcp_server(context: ToolContext) -> FastMCP:
     @server.tool(name="build_supercell")
     async def make_supercell(a: int, b: int, c: int) -> dict:
         """Build a new periodic supercell with integer factors 1–4. Free; the source remains unchanged."""
-        if not context.explicit_tool_request and not re.search(r"supercell|replicat|expand|build|construct|create|make|超胞|扩胞|构建|生成|建模|新建|扩大", context.user_goal, re.I):
+        request_text = context.recent_user_text or context.user_goal
+        if not context.explicit_tool_request and not re.search(r"supercell|replicat|expand|build|construct|create|make|超胞|扩胞|构建|生成|建模|新建|扩大", request_text, re.I):
             return {"status": "needs_clarification", "message": "Ask the researcher to explicitly request a supercell first."}
-        numbers = [int(value) for value in re.findall(r"(?<!\d)\d+(?!\d)", context.user_goal)]
+        numbers = [int(value) for value in re.findall(r"(?<!\d)\d+(?!\d)", request_text)]
         if not context.explicit_tool_request and not any(numbers[index:index + 3] == [a, b, c] for index in range(max(0, len(numbers) - 2))):
             return {"status": "needs_clarification", "message": "Ask the researcher to specify all three supercell factors explicitly."}
         output, report = await anyio.to_thread.run_sync(build_supercell, context.source, (a, b, c), context.artifact_root)
@@ -149,26 +153,16 @@ def create_mcp_server(context: ToolContext) -> FastMCP:
         if job["status"] != "ready":
             return {"status": "unavailable", "message": job.get("error") or "The structure check did not finish."}
         failed = []
-        failed_zh = []
         for frame in job["source_sanity"].get("frames", []):
             for item in frame.get("results", []):
                 if not item.get("passed") or item.get("status") == "skipped" or "skipped" in item.get("message", "").lower():
                     failed.append(item.get("message", "A check needs review."))
-                    failed_zh.append({"hydrogen_presence": "未找到氢原子。", "formula_consistency": "缺少参考化学式，无法核对。"}.get(item.get("name"), item.get("message", "有检查项需要复核。")))
         warning = " ".join(failed[:3])
-        is_chinese = bool(re.search(r"[\u4e00-\u9fff]", context.user_goal))
-        if is_chinese:
-            method_label = {"optimal": "占据率优先", "enumerate": "枚举", "random": "随机采样"}[method]
-            seed_text = f"随机种子为 {options['seed']}；" if options["seed"] is not None else ""
-            prompt = (f"将对当前结构 {context.scene_name} 运行{method_label}无序拆分，最多生成 {options['count']} 个候选；"
-                      f"{seed_text}对称副本独立处理。费用为 PayPal Sandbox 2.00 美元（虚拟资金）。{' '.join(failed_zh[:3])} "
-                      "回复‘同意支付’以发起沙箱结账，或回复‘取消’。之后仍需在 PayPal 页面批准。")
-        else:
-            method_label = {"optimal": "occupancy-favoured", "enumerate": "enumerated", "random": "random-sampling"}[method]
-            seed_text = f" Random seed: {options['seed']}." if options["seed"] is not None else ""
-            prompt = (f"Run {method_label} disorder analysis on {context.scene_name}, with up to {options['count']} candidate(s)."
-                      f"{seed_text} Symmetry copies are independent. USD 2.00 in PayPal Sandbox (no real money). {warning} "
-                      "Reply 'yes' to start sandbox checkout or 'cancel' to decline. PayPal approval is still required.")
+        method_label = {"optimal": "occupancy-favoured", "enumerate": "enumerated", "random": "random-sampling"}[method]
+        seed_text = f" Random seed: {options['seed']}." if options["seed"] is not None else ""
+        prompt = (f"Run {method_label} disorder analysis on {context.scene_name}, with up to {options['count']} candidate(s)."
+                  f"{seed_text} Symmetry copies are independent. USD 2.00 in PayPal Sandbox (no real money). {warning} "
+                  "Reply 'yes' to start sandbox checkout or 'cancel' to decline. PayPal approval is still required.")
         try:
             answer = await ctx.elicit(prompt, PaymentApproval)
         except Exception:

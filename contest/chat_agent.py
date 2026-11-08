@@ -26,7 +26,8 @@ from .mcp_server import ToolContext, create_mcp_server, decode_tool_result
 LOGGER = logging.getLogger(__name__)
 MODEL_TOOLS = {"inspect_structure", "build_supercell", "resolve_disorder_paid", "get_disorder_result", "ask_question"}
 SYSTEM = (
-    "You are a MatterVis assistant for crystal modeling and analysis. Respond in the user's language. "
+    "You are a MatterVis assistant for crystal modeling and analysis. Always respond in English, "
+    "including questions and option labels, even when the user writes in another language. "
     "Use MCP tools for facts about the current structure; do not invent structures or results. "
     "You can inspect the current structure for free, build a new supercell when explicitly asked, "
     "and offer paid disorder resolution through resolve_disorder_paid. Ask for missing supercell "
@@ -129,13 +130,13 @@ class ChatService:
                 if pending["kind"] == "payment":
                     answer = _answer(text)
                     if answer is None:
-                        state["messages"].append({"role": "assistant", "text": "请明确回复‘同意支付’或‘取消’。 / Please reply ‘yes’ or ‘cancel’."})
+                        state["messages"].append({"role": "assistant", "text": "Please reply ‘yes’ or ‘cancel’."})
                         return
                 else:
                     answer = {"choice": text, "other": ""} if text in pending["options"] else {"choice": "Other", "other": text[:500]}
                 if answer and (scene_id != pending["scene_id"] or hashlib.sha256(source.encode("utf-8")).hexdigest() != pending["source_sha256"]):
                     answer = False
-                    state["messages"].append({"role": "assistant", "text": "当前结构已变化，已取消此请求；请重新提出。 / The structure changed, so this request was cancelled."})
+                    state["messages"].append({"role": "assistant", "text": "The structure changed, so this request was cancelled. Please ask again."})
                 pending["decision"] = answer
                 state["phase"] = "preparing_checkout" if pending["kind"] == "payment" and answer is True else "thinking"
                 pending["event"].set()
@@ -148,7 +149,7 @@ class ChatService:
                 job = self.service.load(state["job_id"], owner)
                 if job.get("paid") and job.get("status") == "failed":
                     self.service.retry(job["id"], owner)
-                    state["messages"].extend([{"role": "user", "text": text}, {"role": "assistant", "text": "已重试，不会再次收费。 / Retrying without another payment."}])
+                    state["messages"].extend([{"role": "user", "text": text}, {"role": "assistant", "text": "Retrying without another payment."}])
                     state.update(busy=True, phase="running", reported=False)
                     return
             state["messages"].append({"role": "user", "text": text})
@@ -157,7 +158,8 @@ class ChatService:
             recent_goals = [item["text"] for item in state["messages"] if item.get("role") == "user"][-3:]
             context = ToolContext(service=self.service, owner=owner, source=source, scene_id=scene_id,
                                   scene_name=scene_name or "current structure", browser_target=browser_target,
-                                  structures=structures, artifact_root=self.artifact_root, user_goal="\n".join(recent_goals)[-2000:],
+                                  structures=structures, artifact_root=self.artifact_root, user_goal=text,
+                                  recent_user_text="\n".join(recent_goals)[-2000:],
                                   pending_job_id=state.get("job_id"))
             self.pool.submit(self._run, owner, context)
 
@@ -167,7 +169,7 @@ class ChatService:
         if kind == "payment":
             job = self.service.load(context.pending_job_id, owner)
             source_sha = job["source_sha256"]
-            options = ["同意支付", "取消"] if _zh(params.message) else ["Yes, approve", "Cancel"]
+            options = ["Yes, approve", "Cancel"]
         else:
             source_sha = hashlib.sha256(context.source.encode("utf-8")).hexdigest()
             options = [item for item in ((properties.get("choice") or {}).get("enum") or []) if item != "Other"]
@@ -193,6 +195,7 @@ class ChatService:
         if kind == "question" and isinstance(decision, dict):
             selected = decision.get("other", "") if decision.get("choice") == "Other" else decision.get("choice", "")
             context.user_goal = (context.user_goal + "\n" + selected)[-2000:]
+            context.recent_user_text = (context.recent_user_text + "\n" + selected)[-2000:]
             return ElicitResult(action="accept", content=decision)
         if kind == "payment" and decision is True:
             return ElicitResult(action="accept", content={"approved": True})
@@ -238,6 +241,10 @@ class ChatService:
                     content = reply.get("content")
                     if not isinstance(content, str) or not content.strip():
                         raise IntegrationError("The AI returned an empty response. Please retry.")
+                    if _zh(content):
+                        messages.extend([{"role": "assistant", "content": content},
+                                         {"role": "user", "content": "Please restate your response entirely in English, preserving the same facts and warnings."}])
+                        continue
                     answer = content.strip()[:6000]
                     with self.lock:
                         state = self._state(owner)
@@ -287,11 +294,11 @@ class ChatService:
                     with self.lock:
                         state = self._state(owner)
                         if paid_result["status"] == "paypal_approval_required":
-                            text = "请在 PayPal Sandbox 页面批准，返回后才会开始分析。 / Approve in PayPal Sandbox; analysis starts only after verified capture."
+                            text = "Approve in PayPal Sandbox. Analysis starts only after the payment is verified."
                             state.update(phase="awaiting_paypal", approval_url=paid_result["approval_url"], job_id=context.pending_job_id, busy=True)
                         else:
                             if paid_result["status"] == "needs_new_request":
-                                text = "新结构已创建。请先查看该场景，再单独请求付费分析。 / Review the new scene, then request paid analysis in a new message."
+                                text = "A new structure was created. Review its scene, then request paid analysis in a new message."
                             else:
                                 text = paid_result.get("message", "The payment request was cancelled.")
                             state.update(phase="idle", busy=False, approval_url=None)
@@ -309,10 +316,34 @@ class ChatService:
             state.update(job_id=job_id, approval_url=None, reported=False)
             if success:
                 state.update(busy=True, phase="running")
-                state["messages"].append({"role": "assistant", "text": "PayPal Sandbox 已确认，正在生成并检查候选。 / Sandbox payment verified; analysis is running."})
+                state["messages"].append({"role": "assistant", "text": "Sandbox payment verified; analysis is running."})
             else:
                 state.update(busy=False, phase="idle")
-                state["messages"].append({"role": "assistant", "text": "未完成沙箱付款，未启动付费分析。 / Sandbox payment was not completed; the analysis was not started."})
+                state["messages"].append({"role": "assistant", "text": "Sandbox payment was not completed; the analysis was not started."})
+
+    def restore_paid_job(self, owner, job_id):
+        """Restore a paid result after restart without initiating another charge."""
+        if not job_id:
+            return False
+        with self.lock:
+            state = self._state(owner)
+            if state["messages"] or state.get("job_id"):
+                return False
+            try:
+                job = self.service.load(job_id, owner)
+            except (FileNotFoundError, ValueError):
+                return False
+            if not job.get("paid") or not job.get("capture_id"):
+                return False
+            job = self.service.mark_interrupted_for_retry(job_id, owner)
+            state["job_id"] = job_id
+            if job.get("status") == "complete":
+                state["messages"].append({"role": "assistant", "text": "Restored your completed Sandbox analysis."})
+                state.update(busy=True, phase="running", reported=False)
+            else:
+                state["messages"].append({"role": "assistant", "text": "Your paid analysis did not finish. Reply ‘retry’ to run it again without another payment."})
+                state.update(busy=False, phase="idle", reported=True)
+            return True
 
     def open_candidate(self, owner, index, target, structures):
         with self.lock:
@@ -366,7 +397,7 @@ class ChatService:
                         state["history"].append({"role": "assistant", "content": text})
                         state.update(busy=False, phase="idle", reported=True)
                     elif job["status"] == "failed":
-                        state["messages"].append({"role": "assistant", "text": "分析未完成。回复‘重试’可再次运行，无需再次付款。 / Analysis failed; reply ‘retry’ without another payment."})
+                        state["messages"].append({"role": "assistant", "text": "Analysis failed; reply ‘retry’ to run it again without another payment."})
                         state.update(busy=False, phase="idle", reported=True)
                 except FileNotFoundError:
                     state.update(busy=False, phase="idle", reported=True)
