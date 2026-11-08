@@ -1,14 +1,13 @@
-# MatterVis Studio — demo storyboard
+# MatterVis AI — demo storyboard
 
-Target length: under three minutes. Use the English narration and record real
-actions; identify the sample as synthetic and PayPal as Sandbox.
+Target length: under three minutes, with real interactions and Sandbox labels.
 
-1. Show the original interactive MatterVis viewer and its synthetic disordered CIF.
-2. Rotate the structure; show eight disordered sites and select enumeration.
-3. Check the current scene and show the missing-hydrogen warning before checkout.
-4. Show sandbox buyer approval and the server-verified capture.
-5. Show the AI evidence summary, open both candidates and download the ZIP.
-6. Show the checks and hashes in the bundle; state that candidates need review.
+1. Show the native viewer with the synthetic disordered structure.
+2. In chat, ask for a structure inspection and show the missing-hydrogen warning.
+3. Ask for a 2×1×1 supercell; show the new MatterVis scene and preserved disorder.
+4. Return to the source scene and ask for two enumerated disorder candidates.
+5. Show the MCP confirmation, reply yes, and approve the PayPal Sandbox order.
+6. Show verified completion, the AI comparison, candidate scenes and the ZIP.
 
-Do not record or publish API keys, sandbox credentials or private structures.
-Do not represent a checkout as complete before an actual Sandbox capture.
+Do not record credentials or private structures. Record an actual Sandbox
+capture rather than representing a mocked or unapproved order as complete.

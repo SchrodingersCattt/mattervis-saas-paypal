@@ -11,10 +11,12 @@ import importlib
 import importlib.metadata
 import json
 import logging
+import math
 import os
 import subprocess
 import sys
 import threading
+import time
 import uuid
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
@@ -67,6 +69,8 @@ def validate_options(method, count, seed, coupled):
     if method not in {"optimal", "enumerate", "random"}:
         raise ValueError("Choose a supported method.")
     try:
+        if isinstance(count, bool) or (isinstance(count, float) and (not math.isfinite(count) or not count.is_integer())):
+            raise ValueError
         count = int(count)
     except (TypeError, ValueError):
         raise ValueError("Choose a candidate count from 1 to 8.") from None
@@ -76,6 +80,8 @@ def validate_options(method, count, seed, coupled):
         count = 1
     if method == "random":
         try:
+            if isinstance(seed, bool) or (isinstance(seed, float) and (not math.isfinite(seed) or not seed.is_integer())):
+                raise ValueError
             seed = int(seed)
         except (TypeError, ValueError):
             raise ValueError("Random sampling requires an integer seed.") from None
@@ -115,7 +121,7 @@ class DisorderService:
             temporary.write_text(json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")
             os.replace(temporary, path)
 
-    def create(self, owner, cif, options, scene):
+    def create(self, owner, cif, options, scene, *, research_goal=None):
         if not owner or not isinstance(cif, str) or not cif.strip():
             raise ValueError("Load a valid structure first.")
         if len(cif.encode("utf-8")) > 10 * 1024 * 1024:
@@ -127,7 +133,8 @@ class DisorderService:
         source.write_text(cif, encoding="utf-8", newline="\n")
         record = {"id": job_id, "owner": owner, "status": "checking", "paid": False,
                   "price": PRICE, "source_sha256": digest(source), "scene": scene,
-                  "options": options, "candidates": [], "error": None}
+                  "options": options, "research_goal": (research_goal or "")[:1000],
+                  "candidates": [], "error": None}
         self._save(record)
         self.pool.submit(self._preflight, job_id, owner)
         return record
@@ -151,26 +158,13 @@ class DisorderService:
             # Use the public Python API on one newly loaded crystal. The CLI
             # commands each reload the same CIF and interpreter; sharing this
             # detached object retains the checks without delaying checkout.
-            from molcrys_kit.analysis import summarize_structure
-            from molcrys_kit.analysis.molecular_identity import ChemicalIdentity
-            from molcrys_kit.analysis.sanity_check import sanity_check
-            from molcrys_kit.io import read_mol_crystal
+            from .science_tools import inspect_cif
 
             folder = self._path(job_id)
             record = self.load(job_id, owner)
-            crystal = read_mol_crystal(str(folder / "source.cif"), resolve_disorder=False, bond_scale=1.0)
-            inventory = []
-            for index, molecule in enumerate(crystal.molecules):
-                identity = ChemicalIdentity.from_molecule(molecule, index, crystal=crystal).to_dict()
-                identity["atom_count"] = len(molecule)
-                inventory.append(identity)
-            summary = summarize_structure(crystal, source="source.cif", symprec=0.1)
-            result = sanity_check(crystal).to_dict()
-            sanity = {"file": "source.cif", "n_frames": 1, "n_passed": int(result["passed"]),
-                      "n_failed": int(not result["passed"]), "frames": [{"frame": 0, **result}]}
-            summary = json.loads(json.dumps(summary, default=str))
-            sanity = json.loads(json.dumps(sanity, default=str))
-            (folder / "source-info.stdout.txt").write_text(crystal.summary(), encoding="utf-8")
+            inspection = inspect_cif(folder / "source.cif")
+            inventory, summary, sanity = inspection["molecules"], inspection["summary"], inspection["sanity"]
+            (folder / "source-info.stdout.txt").write_text(inspection["info"], encoding="utf-8")
             (folder / "source-molecules.stdout.txt").write_text(json.dumps(inventory, indent=2, default=str), encoding="utf-8")
             (folder / "source-summary.stdout.txt").write_text(json.dumps(summary, indent=2), encoding="utf-8")
             (folder / "source.sanity.json").write_text(json.dumps(sanity, indent=2), encoding="utf-8")
@@ -200,21 +194,79 @@ class DisorderService:
         except (FileNotFoundError, OSError):
             pass
 
-    def attach_order(self, job_id, owner, order_id):
+    def reserve_checkout(self, job_id, owner, options):
         with self.lock:
             record = self.load(job_id, owner)
             if record["status"] != "ready" or record["paid"]:
                 raise ValueError("This job is not ready for checkout.")
             if digest(self._path(job_id) / "source.cif") != record["source_sha256"]:
                 raise ValueError("The frozen source has changed; prepare a new job.")
+            if record.get("checkout_pending"):
+                if time.time() - float(record.get("checkout_started_at", 0)) < 180:
+                    raise ValueError("PayPal checkout is already being prepared.")
+                record["checkout_pending"] = False
+            if record.get("order_id"):
+                if record.get("options") != options:
+                    raise ValueError("This quote was already sent to PayPal. Check the scene again to change it.")
+                if not record.get("order_reference") or not record.get("approval_url"):
+                    raise ValueError("This earlier checkout cannot be resumed. Check the scene again.")
+                return {"reference": record["order_reference"], "approval_url": record["approval_url"]}
+            quote = {"source_sha256": record["source_sha256"], "parameters": options,
+                     "amount": record["price"], "currency": "USD"}
+            canonical = json.dumps(quote, sort_keys=True, separators=(",", ":"))
+            reference = hashlib.sha256((job_id + ":" + canonical).encode()).hexdigest()[:32]
+            record.update(options=options, quote=quote, order_reference=reference,
+                          checkout_pending=True, checkout_started_at=time.time())
+            self._save(record)
+            return {"reference": reference, "approval_url": None}
+
+    def cancel_checkout_reservation(self, job_id, owner, reference):
+        with self.lock:
+            record = self.load(job_id, owner)
+            if record.get("order_reference") == reference and not record.get("order_id"):
+                record["checkout_pending"] = False
+                self._save(record)
+
+    def attach_order(self, job_id, owner, order_id, reference, approval_url):
+        with self.lock:
+            record = self.load(job_id, owner)
+            if not record.get("checkout_pending") or record.get("order_reference") != reference:
+                raise ValueError("The PayPal order does not match the approved quote.")
             record["order_id"] = order_id
+            record["approval_url"] = approval_url
+            record["checkout_pending"] = False
             self._save(record)
 
-    def mark_paid_and_run(self, job_id, owner, order_id, capture_id):
+    def verify_order_quote(self, job_id, owner, order_id):
         with self.lock:
             record = self.load(job_id, owner)
             if record.get("order_id") != order_id:
                 raise ValueError("The PayPal order does not match this job.")
+            if digest(self._path(job_id) / "source.cif") != record["source_sha256"]:
+                raise ValueError("The source changed after checkout was prepared.")
+            quote = record.get("quote")
+            if quote is not None:
+                expected = {"source_sha256": record["source_sha256"], "parameters": record["options"],
+                            "amount": record["price"], "currency": "USD"}
+                canonical = json.dumps(expected, sort_keys=True, separators=(",", ":"))
+                reference = hashlib.sha256((job_id + ":" + canonical).encode()).hexdigest()[:32]
+                if quote != expected or record.get("order_reference") != reference:
+                    raise ValueError("The PayPal quote no longer matches this job.")
+            return record
+
+    def cancel_unpaid_order(self, job_id, owner):
+        with self.lock:
+            record = self.load(job_id, owner)
+            if record.get("paid"):
+                return False
+            record["cancelled_order_id"] = record.get("order_id")
+            record.update(order_id=None, approval_url=None, checkout_pending=False)
+            self._save(record)
+            return True
+
+    def mark_paid_and_run(self, job_id, owner, order_id, capture_id):
+        with self.lock:
+            record = self.verify_order_quote(job_id, owner, order_id)
             if record.get("paid"):
                 return record
             record.update(paid=True, capture_id=capture_id, status="queued", error=None)
@@ -253,19 +305,47 @@ class DisorderService:
             if not paths or len(paths) > opts["count"]:
                 raise RuntimeError("The resolver returned an unexpected number of candidates.")
             candidates = []
+            from .science_tools import inspect_cif
+
             for index, path in enumerate(paths):
                 stem = f"candidate-{index}"
-                commands.append(self._cli(run, stem + "-info", ["io", "info", path.name]))
-                commands.append(self._cli(run, stem + "-molecules", ["io", "molecules", path.name, "--json"]))
-                commands.append(self._cli(run, stem + "-summary", ["analyze", "summary", path.name, "--json"]))
-                commands.append(self._cli(run, stem + "-sanity", ["analyze", "sanity-check", path.name, "--json", "-o", stem + ".sanity.json"], allowed=(0, 1)))
-                summary = json.loads((run / (stem + "-summary.stdout.txt")).read_text(encoding="utf-8"))
-                sanity = json.loads((run / (stem + ".sanity.json")).read_text(encoding="utf-8"))
+                inspection = inspect_cif(path, source_label=path.name)
+                summary, sanity = inspection["summary"], inspection["sanity"]
+                (run / (stem + "-info.stdout.txt")).write_text(inspection["info"], encoding="utf-8")
+                (run / (stem + "-molecules.stdout.txt")).write_text(json.dumps(inspection["molecules"], indent=2), encoding="utf-8")
+                (run / (stem + "-summary.stdout.txt")).write_text(json.dumps(summary, indent=2), encoding="utf-8")
+                (run / (stem + ".sanity.json")).write_text(json.dumps(sanity, indent=2), encoding="utf-8")
+                commands.append({"api": "molcrys_kit.io.read_mol_crystal + ChemicalIdentity + summarize_structure + sanity_check",
+                                 "source": path.name, "parameters": {"resolve_disorder": False, "bond_scale": 1.0,
+                                                                      "symprec": 0.1, "sanity_profile": "default"},
+                                 "outputs": [stem + "-info.stdout.txt", stem + "-molecules.stdout.txt",
+                                                                      stem + "-summary.stdout.txt", stem + ".sanity.json"]})
                 candidates.append({"index": index, "filename": path.name, "sha256": digest(path), "summary": summary, "sanity": sanity})
-            evidence = {"source": record["source_summary"], "source_sanity": record["source_sanity"], "options": opts, "candidates": candidates}
+            labels = {"hard_clash": "Very short contacts", "intermolecular_clash": "Intermolecular contacts",
+                      "isolated_atoms": "Isolated atoms", "hydrogen_presence": "Hydrogen atoms",
+                      "formula_consistency": "Formula comparison", "bond_distances": "Bond lengths"}
+
+            def readable_checks(sanity):
+                return [{"check": labels.get(item.get("name"), "Structure check"),
+                         "status": "skipped" if "skipped" in item.get("message", "").lower() else
+                                   (item.get("status") or ("passed" if item.get("passed") else "failed")),
+                         "finding": item.get("message", "")}
+                        for frame in sanity.get("frames", []) for item in frame.get("results", [])]
+
+            evidence = {"research_goal": record.get("research_goal") or None,
+                        "source": {key: value for key, value in record["source_summary"].items() if key != "source"},
+                        "source_checks": readable_checks(record["source_sanity"]),
+                        "executed_options": opts,
+                        "candidates": [{"candidate": item["index"] + 1,
+                                        "summary": {key: value for key, value in item["summary"].items() if key != "source"},
+                                        "checks": readable_checks(item["sanity"])}
+                                       for item in candidates]}
             try:
                 ai = model_json(
-                    "Summarize only the supplied MolCrysKit evidence for a researcher. Return JSON "
+                    "Compare the candidates against the researcher's goal using only the supplied "
+                    "MolCrysKit evidence. Explain meaningful supported differences and say when "
+                    "the evidence cannot answer the goal. Executed options are authoritative; "
+                    "the earlier AI suggestion was advisory. Return JSON "
                     "with string keys summary and limitations. Keep the summary under 80 words and "
                     "limitations under 60 words. Use readable scientific language, not code-style "
                     "field names. Mention failed or skipped checks. Never infer an experimentally "
@@ -279,6 +359,7 @@ class DisorderService:
             manifest = {"schema": "mattervis.disorder-bundle/v1", "source_sha256": record["source_sha256"],
                         "parameters": opts, "source_summary": record["source_summary"], "source_sanity": record["source_sanity"],
                         "candidates": candidates, "commands": {"preflight": record["commands"], "resolution": commands},
+                        "approved_quote": record.get("quote"), "research_goal": record.get("research_goal"),
                         "software": software_provenance(), "ai_report": ai,
                         "interpretation": "Candidates are hypotheses. Inspect all outputs and checks; no experimentally dominant configuration is asserted."}
             (run / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")

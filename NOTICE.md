@@ -7,6 +7,8 @@ The disorder example is adapted from
 `tests/fixtures/synthetic_disordered_cation.cif` at MatterVis commit
 `d1de653154d2dba2411c71781d00c22c36f45759`.
 MatterVis is a separate dependency: <https://github.com/SchrodingersCattt/MatterVis>.
+The MCP protocol implementation uses the MIT-licensed
+[MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk).
 
 Before publishing, confirm the upstream project and all dependency licences;
 the upstream README declares MIT but its linked root LICENSE was unavailable

@@ -31,5 +31,5 @@ reverse_check = subprocess.run(
 if reverse_check.returncode:
     run("git", "-C", str(VENDOR), "apply", "--unidiff-zero", "--check", str(PATCH))
     run("git", "-C", str(VENDOR), "apply", "--unidiff-zero", str(PATCH))
-run(sys.executable, "-m", "pip", "install", "-e", str(VENDOR) + "[web]", "dash>=4.1,<5", "requests>=2.32,<3", "python-dotenv>=1,<2", "pytest>=8")
+run(sys.executable, "-m", "pip", "install", "-e", str(VENDOR) + "[web]", "dash>=4.1,<5", "mcp==1.22.0", "requests>=2.32,<3", "python-dotenv>=1,<2", "pytest>=8")
 print("Pinned MatterVis web runtime is ready. Configure .env and run python -m contest.native_app.")
