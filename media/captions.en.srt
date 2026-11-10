@@ -1,87 +1,87 @@
 1
-00:00:00,000 --> 00:00:04,350
+00:00:00,000 --> 00:00:05,080
 AI agents can perform advanced
 scientific computations,
 
 2
-00:00:04,550 --> 00:00:07,350
-but researchers need transparent pricing,
+00:00:05,260 --> 00:00:08,460
+but researchers demand transparent pricing,
 
 3
-00:00:07,950 --> 00:00:10,840
+00:00:08,920 --> 00:00:11,800
 explicit consent, and verified payments
 
 4
-00:00:10,840 --> 00:00:13,430
-before paid workflows execute.
+00:00:11,800 --> 00:00:15,000
+before any paid workflow executes.
 
 5
-00:00:13,900 --> 00:00:18,520
+00:00:15,640 --> 00:00:20,440
 This is a caffeine crystal from the
 Crystallography Open Database.
 
 6
-00:00:18,820 --> 00:00:22,960
-The formula-unit view shows a portion
-of the loaded structure;
+00:00:20,720 --> 00:00:25,580
+The formula-unit view displays a portion
+of the loaded structure,
 
 7
-00:00:22,960 --> 00:00:27,150
-the summary identifies disorder
-at other sites.
+00:00:25,620 --> 00:00:29,320
+while the summary flags disorder
+across other sites.
 
 8
-00:00:27,790 --> 00:00:31,890
+00:00:29,870 --> 00:00:33,990
 In the unit-cell view, overlapping
-disorder components create clash warnings.
+disorder components trigger clash warnings.
 
 9
-00:00:32,390 --> 00:00:35,070
-I ask for up to two enumerated
+00:00:34,090 --> 00:00:36,970
+I request up to two enumerated
 disorder candidates.
 
 10
-00:00:35,570 --> 00:00:38,340
-The MCP tool presents the method,
+00:00:38,050 --> 00:00:41,110
+The MCP tool returns the method,
 candidate count,
 
 11
-00:00:38,470 --> 00:00:41,040
+00:00:41,210 --> 00:00:43,850
 clash warnings, and the two-dollar
 Sandbox price.
 
 12
-00:00:41,690 --> 00:00:43,110
+00:00:44,470 --> 00:00:46,130
 I can approve or cancel.
 
 13
-00:00:45,620 --> 00:00:48,440
+00:00:48,620 --> 00:00:51,020
 I approve the PayPal test order.
 
 14
-00:00:48,440 --> 00:00:52,900
+00:00:51,020 --> 00:00:55,900
 Back in MatterVis, the server verifies
-the capture before the analysis runs.
+payment capture before running the analysis.
 
 15
-00:00:53,340 --> 00:00:56,500
-I can open the candidate structures,
+00:00:56,420 --> 00:00:59,700
+I can inspect the candidate structures,
 review their checks,
 
 16
-00:00:56,770 --> 00:00:58,400
+00:00:59,780 --> 00:01:01,420
 and download the result package.
 
 17
-00:00:58,720 --> 00:01:02,370
-Physical stability and the experimentally
-dominant configuration
+00:01:01,840 --> 00:01:05,160
+Physical stability and the dominant
+experimental configuration
 
 18
-00:01:02,370 --> 00:01:04,380
-require independent validation;
+00:01:05,160 --> 00:01:07,560
+still require independent validation;
 
 19
-00:01:05,120 --> 00:01:07,960
-these candidates are hypotheses
-for human review.
+00:01:07,560 --> 00:01:11,980
+these candidates serve as transparent
+hypotheses for human review.
