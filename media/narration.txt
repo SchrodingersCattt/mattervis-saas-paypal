@@ -1,8 +1,8 @@
 AI agents can perform advanced scientific computations, but researchers need transparent pricing, explicit consent, and verified payments before paid workflows execute.
 
-This is the caffeine crystal COD 4504310. The formula-unit view shows only part of the loaded structure; the summary tells us that other sites contain disorder.
+This is a caffeine crystal from the Crystallography Open Database. The formula-unit view shows a portion of the loaded structure; the summary identifies disorder at other sites.
 
-In the unit-cell view, overlapping alternative disorder components become visible. The displayed counts include copies.
+In the unit-cell view, overlapping disorder components create clash warnings.
 
 I ask for up to two enumerated disorder candidates. The MCP tool presents the method, candidate count, clash warnings, and the two-dollar Sandbox price. I can approve or cancel.
 
