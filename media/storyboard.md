@@ -4,7 +4,9 @@ Record one real COD 4504310 Sandbox run. Keep the finished video under three
 minutes; the suggested timings are guides. The opening
 voiceover is the first sentence of `narration.txt` and of the Devpost draft.
 Use the owner's designated TTS voice and verify the audio watermark after final
-encoding, following the project media instructions in `AGENTS.md`.
+encoding, following the project media instructions in `AGENTS.md`. Include
+proofread English subtitles in a dedicated lower band that keeps the product,
+PayPal amount, approval and download controls visible.
 
 1. **Loaded caffeine and hidden disorder (about 0:00–0:20).** Open the default
    sample. Make `COD 4504310` and the formula-unit summary readable. The summary

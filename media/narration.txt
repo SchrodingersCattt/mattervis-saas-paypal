@@ -6,6 +6,6 @@ In the unit-cell view, overlapping disorder components create clash warnings.
 
 I ask for up to two enumerated disorder candidates. The MCP tool presents the method, candidate count, clash warnings, and the two-dollar Sandbox price. I can approve or cancel.
 
-I approve the Sandbox order in PayPal. Back in MatterVis, the server verifies the capture before the analysis runs.
+I approve the PayPal test order. Back in MatterVis, the server verifies the capture before the analysis runs.
 
 I can open the candidate structures, review their checks, and download the result package. Physical stability and the experimentally dominant configuration require independent validation; these candidates are hypotheses for human review.
