@@ -57,6 +57,7 @@ class MatterVisChat(Extension):
         return html.Div([
             html.H3("MatterVis AI"),
             html.P("Ask about the current structure, build a supercell, or request disorder analysis."),
+            html.P(["Bundled example: caffeine crystal (", html.A("COD 4504310", href="https://www.crystallography.net/cod/4504310.html", target="_blank", rel="noopener noreferrer"), ")."], className="chat-footnote"),
             html.Div(id="chat-messages", className="chat-messages", role="log", **{"aria-live": "polite"}),
             html.Div(id="chat-status", className="chat-status", role="status"),
             dcc.Textarea(id="chat-input", placeholder="Ask me to inspect the structure or build a 2×2×1 supercell…", maxLength=2000,
@@ -100,7 +101,7 @@ class MatterVisChat(Extension):
                 result = asyncio.run(capture())
                 success = result.get("status") == "captured"
                 chat.payment_returned(owner, job_id, success)
-                return payment_result_page("Sandbox payment verified; analysis is running." if success else "Sandbox payment could not be verified.")
+                return payment_result_page("PayPal Sandbox capture verified; analysis is running." if success else "Sandbox payment could not be verified.")
             except Exception:
                 LOGGER.exception("Could not verify Sandbox return")
                 if owner:
@@ -354,7 +355,7 @@ def create_native_app(*, data_root=None, input_path=None):
 
 
 def main():
-    default_example = ROOT / "contest" / "static" / "disorder-example.cif"
+    default_example = ROOT / "contest" / "static" / "caffeine.cif"
     app = create_native_app(data_root=os.getenv("MATTERVIS_DATA_DIR") or None,
                             input_path=os.getenv("MATTERVIS_INPUT") or str(default_example))
     try:

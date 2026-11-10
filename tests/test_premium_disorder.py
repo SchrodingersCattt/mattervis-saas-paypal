@@ -11,6 +11,7 @@ from contest.disorder_service import DisorderService, validate_options
 from contest.chat_agent import ChatService
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "contest" / "static" / "disorder-example.cif"
+CAFFEINE = EXAMPLE.with_name("caffeine.cif")
 
 
 def wait_for(service, job_id, owner, states, timeout=180):
@@ -30,6 +31,43 @@ def test_random_requires_reproducible_seed():
     assert validate_options("optimal", 7, 99, False)["count"] == 1
     with pytest.raises(ValueError):
         validate_options("enumerate", 1.5, None, False)
+
+
+def test_caffeine_sample_generates_checked_candidates_after_approval(tmp_path, monkeypatch):
+    """Exercise the real published CIF through the paid-job boundary with a mocked capture."""
+    evidence = {}
+
+    def model(_system, prompt):
+        evidence.update(json.loads(prompt))
+        return {"summary": "Two candidate models were generated.", "limitations": "Review all checks."}
+
+    monkeypatch.setattr("contest.disorder_service.model_json", model)
+    service = DisorderService(tmp_path)
+    try:
+        job = service.create("owner", CAFFEINE.read_text(encoding="utf-8"),
+                             validate_options("enumerate", 2, None, False), {"structure": "caffeine"})
+        job = wait_for(service, job["id"], "owner", {"ready", "failed"})
+        assert job["status"] == "ready", job.get("error")
+        assert job["source_summary"]["n_atoms"] == 768
+        assert job["source_summary"]["disorder"]["has_disorder"]
+        with pytest.raises(PermissionError):
+            service.result_path(job["id"], "owner")
+        quote = service.reserve_checkout(job["id"], "owner", job["options"])
+        service.attach_order(job["id"], "owner", "mock-order", quote["reference"], "https://sandbox.paypal.com/test")
+        service.mark_paid_and_run(job["id"], "owner", "mock-order", "mock-capture")
+        job = wait_for(service, job["id"], "owner", {"complete", "failed"})
+        assert job["status"] == "complete", job.get("error")
+        assert len(job["candidates"]) == len(evidence["candidates"]) == 2
+        assert len({item["sha256"] for item in job["candidates"]}) == 2
+        for candidate in job["candidates"]:
+            assert candidate["summary"]["n_atoms"] == 480
+            assert not candidate["summary"]["disorder"]["has_disorder"]
+            checks = {r["name"]: r for r in candidate["sanity"]["frames"][0]["results"]}
+            assert all(checks[name]["passed"] for name in ("hard_clash", "intermolecular_clash", "hydrogen_presence", "bond_distances"))
+        assert any(item["check"] == "Formula comparison" and item["status"] == "skipped"
+                   for item in evidence["candidates"][0]["checks"])
+    finally:
+        service.close()
 
 
 def test_native_viewer_uses_explicit_light_theme(tmp_path, monkeypatch):

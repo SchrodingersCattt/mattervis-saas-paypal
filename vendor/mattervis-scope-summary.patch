@@ -1,0 +1,62 @@
+diff --git a/mat_viewer/app/callbacks_view.py b/mat_viewer/app/callbacks_view.py
+index 058dbce..a5fdd1c 100644
+--- a/mat_viewer/app/callbacks_view.py
++++ b/mat_viewer/app/callbacks_view.py
+@@ -841 +841,3 @@ def register_view_callbacks(app, backend):
+-            return (no_update,) * 4
++            # The summary describes the current display scope even while the
++            # corresponding figure is still being built by the render worker.
++            return no_update, no_update, no_update, _structure_summary(backend.scene_for_state(state))
+@@ -851 +853 @@ def register_view_callbacks(app, backend):
+-            return (no_update,) * 4
++            return no_update, no_update, no_update, _structure_summary(backend.scene_for_state(state))
+@@ -874 +876 @@ def register_view_callbacks(app, backend):
+-            summary = _structure_summary(backend.get_bundle(state["structure"]).scene)
++            summary = _structure_summary(backend.scene_for_state(state))
+diff --git a/mat_viewer/app/camera_helpers.py b/mat_viewer/app/camera_helpers.py
+index e6fc34e..68f5f20 100644
+--- a/mat_viewer/app/camera_helpers.py
++++ b/mat_viewer/app/camera_helpers.py
+@@ -86,2 +86,3 @@ def _structure_summary(scene: dict) -> str:
+-            f"Disorder detected: {disordered_atoms} site(s), "
+-            f"{minor_atoms} minor atoms, {minor_bonds} minor bonds."
++            f"Displayed atoms: {disordered_atoms} with disorder, "
++            f"{minor_atoms} minor atoms, {minor_bonds} minor bonds. "
++            "Counts include displayed copies."
+@@ -90 +91,11 @@ def _structure_summary(scene: dict) -> str:
+-    return f"Disorder: none detected.{overflow_text}"
++    if scene.get("source_has_disorder") is True:
++        return (
++            "No disorder in displayed atoms. The loaded structure contains "
++            f"disorder at other sites.{overflow_text}"
++        )
++    if scene.get("source_has_disorder") is False:
++        return f"No disorder detected in the loaded structure or displayed atoms.{overflow_text}"
++    return (
++        "No disorder detected in displayed atoms. "
++        f"Source structure disorder information unavailable.{overflow_text}"
++    )
+diff --git a/mat_viewer/loader/bundle_builder.py b/mat_viewer/loader/bundle_builder.py
+index 30262a8..ae15a46 100644
+--- a/mat_viewer/loader/bundle_builder.py
++++ b/mat_viewer/loader/bundle_builder.py
+@@ -151,0 +152,11 @@ def build_loaded_crystal_from_atoms(
++    # Use the same source-level disorder fact as the scientific inspection
++    # tool. The formula-unit view can omit disordered sites entirely.
++    from molcrys_kit.analysis import summarize_structure
++
++    try:
++        initial_scene["source_has_disorder"] = bool(
++            summarize_structure(molcrys_analysis.crystal)["disorder"]["has_disorder"]
++        )
++    except Exception:
++        # Missing source information must not be reported as an ordered source.
++        initial_scene["source_has_disorder"] = None
+diff --git a/mat_viewer/loader/core.py b/mat_viewer/loader/core.py
+index fbc27fe..912a994 100644
+--- a/mat_viewer/loader/core.py
++++ b/mat_viewer/loader/core.py
+@@ -610,0 +611 @@ def build_bundle_scene(
++        base_scene["source_has_disorder"] = bundle.scene.get("source_has_disorder")
+@@ -726,0 +728 @@ def build_bundle_scene(
++    transformed["source_has_disorder"] = base_scene.get("source_has_disorder")

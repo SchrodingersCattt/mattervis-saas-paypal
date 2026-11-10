@@ -1,9 +1,11 @@
-Crystal structures can contain disordered atomic positions. Researchers need usable models, clear checks, and control over the cost of advanced analysis.
+AI agents can perform advanced scientific computations, but researchers need transparent pricing, explicit consent, and verified payments before paid workflows execute.
 
-MatterVis AI adds a conversation to the original interactive viewer. Ask it to inspect a structure or build a supercell, and it calls real scientific tools through the Model Context Protocol. The original structure remains available for comparison.
+This is the caffeine crystal COD 4504310. The formula-unit view shows only part of the loaded structure; the summary tells us that other sites contain disorder.
 
-When the researcher requests disorder analysis, the paid MCP tool describes the method, candidate count, warnings, and price. It asks for explicit consent before creating a PayPal Sandbox order.
+In the unit-cell view, overlapping alternative disorder components become visible. The displayed counts include copies.
 
-After the researcher agrees, they approve the virtual order in PayPal. The server verifies the capture, then generates and checks candidate structures. The assistant compares the evidence and explains its limitations.
+I ask for up to two enumerated disorder candidates. The MCP tool presents the method, candidate count, clash warnings, and the two-dollar Sandbox price. I can approve or cancel.
 
-Open each candidate in MatterVis or download the structures and provenance. No real money is charged, and the candidates remain hypotheses for human review.
+I approve the Sandbox order in PayPal. Back in MatterVis, the server verifies the capture before the analysis runs.
+
+I can open the candidate structures, review their checks, and download the result package. Physical stability and the experimentally dominant configuration require independent validation; these candidates are hypotheses for human review.
